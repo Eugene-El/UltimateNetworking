@@ -45,7 +45,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Extensions\MemoryStreamExtensions.cs" />
     <Compile Include="Interfaces\Servers\IBasicServer.cs" />
+    <Compile Include="Networking\Managers\ConnectionManager.cs" />
     <Compile Include="Networking\Packets\BasicPacket.cs" />
     <Compile Include="Networking\Servers\BasicServer.cs" />
     <Compile Include="Networking\Servers\NetUnit.cs" />

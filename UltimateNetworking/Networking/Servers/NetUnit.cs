@@ -6,6 +6,8 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using UltimateNetworking.Extensions;
+using UltimateNetworking.Networking.Managers;
 using UltimateNetworking.Networking.Packets;
 using UniversalLogger;
 
@@ -17,6 +19,7 @@ namespace UltimateNetworking.Networking.Servers
         private Socket mySocket;
         private ManualResetEvent allDone;
         private int bufferSize;
+        private ConnectionManager connectionManager;
 
         public NetUnit(int bufferSize = 1024, int port = 11000)
         {
@@ -34,6 +37,8 @@ namespace UltimateNetworking.Networking.Servers
 
                 mySocket.Bind(localEndPoint);
                 mySocket.Listen(200);
+
+                connectionManager = new ConnectionManager();
 
                 logger.Info("Server started!");
 
@@ -55,7 +60,7 @@ namespace UltimateNetworking.Networking.Servers
 
                     logger.Info("Waiting for connection...");
 
-                    mySocket.BeginAccept(new AsyncCallback(AcceptCallback), mySocket);// listener);
+                    mySocket.BeginAccept(new AsyncCallback(AcceptCallback), mySocket);
 
                     allDone.WaitOne();
                 }
@@ -70,10 +75,10 @@ namespace UltimateNetworking.Networking.Servers
         {
             allDone.Set();
 
-            Socket ishikSocket = mySocket.EndAccept(ar);
-            BasicPacket packet = new BasicPacket(ishikSocket, bufferSize);
+            Socket mySocket = this.mySocket.EndAccept(ar);
+            BasicPacket packet = new BasicPacket(mySocket, bufferSize);
 
-            ishikSocket.BeginReceive(packet.Buffer, 0, bufferSize,
+            mySocket.BeginReceive(packet.Buffer, 0, bufferSize,
                 0, new AsyncCallback(ReadCallback), packet);
 
         }
@@ -85,6 +90,20 @@ namespace UltimateNetworking.Networking.Servers
 
             int bytesRead = ishikSocket.EndReceive(ar);
             logger.Info("Bytes readed: " + bytesRead);
+
+            packet.MemOry.Append(packet.Buffer.Take(bytesRead).ToArray());
+
+            if (bytesRead == bufferSize)
+            {
+                // Read again
+                ishikSocket.BeginReceive(packet.Buffer, 0, bufferSize, 0,
+                    new AsyncCallback(ReadCallback), packet);
+
+            } else {
+                // End
+
+                logger.Info("Readed data: " + Encoding.ASCII.GetString(packet.MemOry.ToArray()));
+            }
         }
 
         public void Send(Socket ishikSocket, byte[] data)
@@ -100,11 +119,8 @@ namespace UltimateNetworking.Networking.Servers
                 IPHostEntry ipHostInfo = Dns.GetHostEntry(ip);
                 IPAddress ipAddress = ipHostInfo.AddressList[0];
                 IPEndPoint remoteEP = new IPEndPoint(ipAddress, port);
-                
-                Socket ishikScoket = new Socket(ipAddress.AddressFamily,
-                    SocketType.Stream, ProtocolType.Tcp);
 
-                ishikScoket.Connect(remoteEP);
+                Socket ishikScoket = connectionManager.Connect(remoteEP);
 
                 Send(ishikScoket, data);
             }
@@ -122,9 +138,9 @@ namespace UltimateNetworking.Networking.Servers
 
                 int bytesSended = ishikScoket.EndSend(ar);
                 logger.Info("Bytes sended: " + bytesSended);
-
-                ishikScoket.Shutdown(SocketShutdown.Both);
-                ishikScoket.Close();
+                
+                //ishikScoket.Shutdown(SocketShutdown.Both);
+                //ishikScoket.Close();
             }
             catch (Exception excception)
             {
